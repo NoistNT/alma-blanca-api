@@ -49,13 +49,13 @@ export class ProductsService {
       const data = (await response.json()) as Products[];
 
       const products: Products[] = data.map(
-        ({ id, name, description, price, link, image }) => ({
+        ({ id, name, description, price, link, images }) => ({
           id,
           name,
           description,
           price,
           link,
-          image: { id: image.id, link: image.link },
+          images: images.map(({ id, link }) => ({ id, link })),
         }),
       );
 
