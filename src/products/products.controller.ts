@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ProductsService } from './products.service';
+import { Products } from './types';
 
 @Controller('products')
 export class ProductsController {
@@ -8,6 +9,11 @@ export class ProductsController {
   @Get()
   getCookiesSession() {
     return this.productsService.getCookiesSession();
+  }
+
+  @Get()
+  findAllFromApi(): Promise<Products[]> {
+    return this.productsService.findAllFromApi();
   }
 
   @Get()
