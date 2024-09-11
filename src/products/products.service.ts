@@ -1,6 +1,6 @@
 import { API_URL, SESSION_NAME } from '@/constants';
 import { Injectable } from '@nestjs/common';
-import * as fs from 'fs';
+import { chromium } from 'playwright';
 import {
   ApiResponse,
   FindAllFromApiResponse,
@@ -10,18 +10,33 @@ import {
 
 @Injectable()
 export class ProductsService {
+  private async getCookiesSession() {
+    try {
+      const browser = await chromium.launch();
+      const context = await browser.newContext();
+
+      const page = await context.newPage();
+      await page.goto(API_URL);
+
+      // Extract cookies from the context
+      const cookies = await context.cookies();
+      if (!cookies) throw new Error('Cookies not found');
+
+      await page.close();
+      await browser.close();
+
+      return cookies;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+        throw new Error(error.message);
+      }
+    }
+  }
+
   private async getCookie(): Promise<{ Cookie: string }> {
     try {
-      // Check if cookies.json exists
-      if (!fs.existsSync('cookies.json')) {
-        throw new Error('Cookies file does not exist. First run the scraper.');
-      }
-
-      // Read and parse cookies.json
-      const fileContent = fs.readFileSync('cookies.json', 'utf8');
-      if (!fileContent) throw new Error('Cookies file is empty.');
-
-      const cookies: ICookie[] = JSON.parse(fileContent);
+      const cookies: ICookie[] = await this.getCookiesSession();
 
       // Find the correct cookie
       const cookie: ICookie = cookies.find(({ name }) => name === SESSION_NAME);
@@ -50,7 +65,6 @@ export class ProductsService {
         throw new Error(`API request failed with status: ${response.status}`);
 
       const { data } = (await response.json()) as ApiResponse;
-      console.log(data);
 
       const products: Products[] = data.map(
         ({
