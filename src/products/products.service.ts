@@ -91,17 +91,48 @@ export class ProductsService {
     );
   }
 
+  private async findLastPage() {
+    let lastPageKnown = Number(LAST_PAGE_KNOWN);
+
+    try {
+      const headers = await this.getCookie();
+      if (!headers) throw new Error('Cookie not found');
+
+      console.log(`Last page known: ${lastPageKnown}`);
+
+      while (true) {
+        const { data } = await this.fetchProductsFromApi(
+          lastPageKnown,
+          headers,
+        );
+
+        if (!data.length) {
+          --lastPageKnown;
+          console.log(`Last page found: ${lastPageKnown}`);
+          break;
+        }
+
+        lastPageKnown++;
+      }
+
+      return lastPageKnown;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+        throw new Error(error.message);
+      }
+    }
+  }
+
   private async fetchAllPages(headers: HeadersInit): Promise<Product[]> {
-    let page = 0;
-    const lastPage = Number(LAST_PAGE_KNOWN);
+    const lastPage = await this.findLastPage();
     const productsList: Product[] = [];
 
-    while (page < lastPage) {
+    for (let page = 0; page <= lastPage; page++) {
       const { data } = await this.fetchProductsFromApi(page, headers);
       const products = this.mapProducts(data);
       productsList.push(...products);
       console.log(`Page ${page} fetched`);
-      page++;
     }
 
     return productsList;
@@ -110,9 +141,7 @@ export class ProductsService {
   private async fetchAllPerPageFromApi(): Promise<Product[]> {
     try {
       const headers = await this.getCookie();
-      if (!headers) {
-        throw new Error('Cookie not found');
-      }
+      if (!headers) throw new Error('Cookie not found');
 
       return await this.fetchAllPages(headers);
     } catch (error) {
