@@ -1,11 +1,11 @@
-import { API_URL, SESSION_NAME } from '@/constants';
+import { API_URL, LAST_PAGE_KNOWN, SESSION_NAME } from '@/constants';
 import { Injectable } from '@nestjs/common';
 import { chromium } from 'playwright';
 import {
   ApiResponse,
   FindAllFromApiResponse,
-  ICookie,
-  Products,
+  Product,
+  ProductFromApi,
 } from './types';
 
 @Injectable()
@@ -34,12 +34,12 @@ export class ProductsService {
     }
   }
 
-  private async getCookie(): Promise<{ Cookie: string }> {
+  private async getCookie(): Promise<HeadersInit> {
     try {
-      const cookies: ICookie[] = await this.getCookiesSession();
+      const cookies = await this.getCookiesSession();
 
       // Find the correct cookie
-      const cookie: ICookie = cookies.find(({ name }) => name === SESSION_NAME);
+      const cookie = cookies.find(({ name }) => name === SESSION_NAME);
       if (!cookie) throw new Error(`Cookie not found.`);
 
       // Return cookie header
@@ -52,44 +52,80 @@ export class ProductsService {
     }
   }
 
-  // TODO: Update to fetch products from all pages, currently it only fetches the first page
-  async findAllFromApi(): Promise<FindAllFromApiResponse> {
+  private async fetchProductsFromApi(
+    page: number,
+    headers: HeadersInit,
+  ): Promise<ApiResponse> {
+    const uri = `${API_URL}/v4/product?filter_page=${page}&filter_order=0`;
+    const response = await fetch(uri, { headers });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status: ${response.status}`);
+    }
+
+    return response.json() as Promise<ApiResponse>;
+  }
+
+  private mapProducts(data: ProductFromApi[]): Product[] {
+    return data.map(
+      ({
+        idProductos,
+        p_nombre,
+        p_descripcion,
+        p_precio,
+        p_link,
+        p_oferta,
+        imagenes,
+      }) => ({
+        id: idProductos,
+        name: p_nombre,
+        description: p_descripcion,
+        price: p_precio,
+        link: p_link,
+        onSale: p_oferta,
+        images: imagenes.map(({ idImagenes, i_link }) => ({
+          id: idImagenes,
+          link: i_link,
+        })),
+      }),
+    );
+  }
+
+  private async fetchAllPages(headers: HeadersInit): Promise<Product[]> {
+    let page = 0;
+    const lastPage = Number(LAST_PAGE_KNOWN);
+    const productsList: Product[] = [];
+
+    while (page < lastPage) {
+      const { data } = await this.fetchProductsFromApi(page, headers);
+      const products = this.mapProducts(data);
+      productsList.push(...products);
+      console.log(`Page ${page} fetched`);
+      page++;
+    }
+
+    return productsList;
+  }
+
+  private async fetchAllPerPageFromApi(): Promise<Product[]> {
     try {
       const headers = await this.getCookie();
-      if (!headers) throw new Error('Cookie not found');
+      if (!headers) {
+        throw new Error('Cookie not found');
+      }
 
-      const uri = `${API_URL}/v4/product?filter_page=0&filter_order=0`;
+      return await this.fetchAllPages(headers);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+        throw new Error(error.message);
+      }
+    }
+  }
 
-      const response = await fetch(uri, { headers });
-      if (!response.ok)
-        throw new Error(`API request failed with status: ${response.status}`);
-
-      const { data } = (await response.json()) as ApiResponse;
-
-      const products: Products[] = data.map(
-        ({
-          idProductos,
-          p_nombre,
-          p_descripcion,
-          p_precio,
-          p_link,
-          p_oferta,
-          imagenes,
-        }) => ({
-          id: idProductos,
-          name: p_nombre,
-          description: p_descripcion,
-          price: p_precio,
-          link: p_link,
-          onSale: p_oferta,
-          images: imagenes.map(({ idImagenes, i_link }) => ({
-            id: idImagenes,
-            link: i_link,
-          })),
-        }),
-      );
-
-      return { data: products };
+  async findAllFromApi(): Promise<FindAllFromApiResponse> {
+    try {
+      return { data: await this.fetchAllPerPageFromApi() };
     } catch (error) {
       if (error instanceof Error) {
         console.error(error.message);
