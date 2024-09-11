@@ -52,21 +52,21 @@ export interface ApiResponse {
   data: ProductFromApi[];
 }
 
-interface Images {
+interface Image {
   id: number;
   link: string;
 }
 
-export interface Products {
+export interface Product {
   id: number;
   name: string;
   description: string;
   price: number;
   link: string;
   onSale: number;
-  images: Images[];
+  images: Image[];
 }
 
 export interface FindAllFromApiResponse {
-  data: Products[];
+  data: Product[];
 }
