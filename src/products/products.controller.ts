@@ -1,18 +1,12 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { Products } from './types';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  getCookiesSession() {
-    return this.productsService.getCookiesSession();
-  }
-
-  @Get()
-  findAllFromApi(): Promise<Products[]> {
+  findAllFromApi() {
     return this.productsService.findAllFromApi();
   }
 
