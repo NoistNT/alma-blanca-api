@@ -106,8 +106,7 @@ export class ProductsService {
           headers,
         );
 
-        if (!data.length) {
-          --lastPageKnown;
+        if (!data.length || data.length < 12) {
           console.log(`Last page found: ${lastPageKnown}`);
           break;
         }
