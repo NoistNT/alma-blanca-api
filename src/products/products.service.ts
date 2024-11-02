@@ -1,12 +1,8 @@
 import { API_URL, LAST_PAGE_KNOWN, SESSION_NAME } from '@/constants';
-import { Injectable } from '@nestjs/common';
+import { createHttpException, handleError } from '@/shared/utils';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { chromium } from 'playwright';
-import {
-  ApiResponse,
-  FindAllFromApiResponse,
-  Product,
-  ProductFromApi,
-} from './types';
+import { ApiResponse, FindAllFromApiResponse, Product, ProductFromApi } from './types';
 
 @Injectable()
 export class ProductsService {
@@ -20,17 +16,14 @@ export class ProductsService {
 
       // Extract cookies from the context
       const cookies = await context.cookies();
-      if (!cookies) throw new Error('Cookies not found');
+      if (!cookies) throw createHttpException('Cookies not found', HttpStatus.INTERNAL_SERVER_ERROR);
 
       await page.close();
       await browser.close();
 
       return cookies;
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-        throw new Error(error.message);
-      }
+      return handleError(error, 'Error getting cookies');
     }
   }
 
@@ -40,55 +33,39 @@ export class ProductsService {
 
       // Find the correct cookie
       const cookie = cookies.find(({ name }) => name === SESSION_NAME);
-      if (!cookie) throw new Error(`Cookie not found.`);
+      if (!cookie) throw createHttpException('Cookie not found', HttpStatus.INTERNAL_SERVER_ERROR);
 
       // Return cookie header
       return { Cookie: `${cookie.name}=${cookie.value}` };
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-        throw new Error(error.message);
-      }
+      return handleError(error, 'Error getting cookie');
     }
   }
 
-  private async fetchProductsFromApi(
-    page: number,
-    headers: HeadersInit,
-  ): Promise<ApiResponse> {
+  private async fetchProductsFromApi(page: number, headers: HeadersInit): Promise<ApiResponse> {
     const uri = `${API_URL}/v4/product?filter_page=${page}&filter_order=0`;
     const response = await fetch(uri, { headers });
 
     if (!response.ok) {
-      throw new Error(`API request failed with status: ${response.status}`);
+      throw createHttpException('Error fetching products', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     return response.json() as Promise<ApiResponse>;
   }
 
   private mapProducts(data: ProductFromApi[]): Product[] {
-    return data.map(
-      ({
-        idProductos,
-        p_nombre,
-        p_descripcion,
-        p_precio,
-        p_link,
-        p_oferta,
-        imagenes,
-      }) => ({
-        id: idProductos,
-        name: p_nombre,
-        description: p_descripcion,
-        price: p_precio,
-        link: p_link,
-        onSale: p_oferta,
-        images: imagenes.map(({ idImagenes, i_link }) => ({
-          id: idImagenes,
-          link: i_link,
-        })),
-      }),
-    );
+    return data.map(({ idProductos, p_nombre, p_descripcion, p_precio, p_link, p_oferta, imagenes }) => ({
+      id: idProductos,
+      name: p_nombre,
+      description: p_descripcion,
+      price: p_precio,
+      link: p_link,
+      onSale: p_oferta,
+      images: imagenes.map(({ idImagenes, i_link }) => ({
+        id: idImagenes,
+        link: i_link,
+      })),
+    }));
   }
 
   private async findLastPage() {
@@ -101,10 +78,7 @@ export class ProductsService {
       console.log(`Last page known: ${lastPageKnown}`);
 
       while (true) {
-        const { data } = await this.fetchProductsFromApi(
-          lastPageKnown,
-          headers,
-        );
+        const { data } = await this.fetchProductsFromApi(lastPageKnown, headers);
 
         if (!data.length || data.length < 12) {
           console.log(`Last page found: ${lastPageKnown}`);
@@ -116,10 +90,7 @@ export class ProductsService {
 
       return lastPageKnown;
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-        throw new Error(error.message);
-      }
+      return handleError(error, 'Error finding last page');
     }
   }
 
@@ -140,14 +111,11 @@ export class ProductsService {
   private async fetchAllPerPageFromApi(): Promise<Product[]> {
     try {
       const headers = await this.getCookie();
-      if (!headers) throw new Error('Cookie not found');
+      if (!headers) throw createHttpException('Cookie not found', HttpStatus.INTERNAL_SERVER_ERROR);
 
       return await this.fetchAllPages(headers);
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-        throw new Error(error.message);
-      }
+      return handleError(error, 'Error fetching all products on the page');
     }
   }
 
@@ -155,10 +123,7 @@ export class ProductsService {
     try {
       return { data: await this.fetchAllPerPageFromApi() };
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-        throw new Error(error.message);
-      }
+      return handleError(error, 'Error fetching all products from API');
     }
   }
 
