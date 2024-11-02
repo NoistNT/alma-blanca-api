@@ -2,13 +2,7 @@ import { ConfigModule } from '@nestjs/config';
 
 ConfigModule.forRoot();
 
-const envVariables = [
-  'PORT',
-  'BASE_URL',
-  'API_URL',
-  'SESSION_NAME',
-  'LAST_PAGE_KNOWN',
-];
+const envVariables = ['PORT', 'BASE_URL', 'API_URL', 'SESSION_NAME', 'LAST_PAGE_KNOWN'];
 
 const customError = (envVariable: string) => {
   const message = `${envVariable} is not defined`;
@@ -22,5 +16,4 @@ for (const envVariable of envVariables) {
   }
 }
 
-export const { PORT, BASE_URL, API_URL, SESSION_NAME, LAST_PAGE_KNOWN } =
-  process.env;
+export const { PORT, BASE_URL, API_URL, SESSION_NAME, LAST_PAGE_KNOWN } = process.env;
