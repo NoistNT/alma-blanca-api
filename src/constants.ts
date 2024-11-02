@@ -1,18 +1,14 @@
+import { HttpStatus } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { createHttpException } from './shared/utils';
 
 ConfigModule.forRoot();
 
 const envVariables = ['PORT', 'BASE_URL', 'API_URL', 'SESSION_NAME', 'LAST_PAGE_KNOWN'];
 
-const customError = (envVariable: string) => {
-  const message = `${envVariable} is not defined`;
-  console.error(message);
-  throw new Error(message);
-};
-
 for (const envVariable of envVariables) {
   if (!process.env[envVariable]) {
-    customError(envVariable);
+    createHttpException(`Missing env variable: ${envVariable}`, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }
 
